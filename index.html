@@ -173,9 +173,14 @@ summary{cursor:pointer;font-weight:700;font-size:15px}
 .ic .kd{border:0.4mm solid #000;font-weight:700;font-size:13pt;padding:0.6mm 2.5mm;line-height:1.2}
 .ic .qt{font-size:17pt;font-weight:700;line-height:1}
 .ic .qt small{font-size:10pt;font-weight:400;margin-right:1.5mm}
-.ic .nm{margin-top:3mm;height:13mm;display:flex;flex-direction:column;justify-content:center;font-weight:700;line-height:1.2}
+.ic .nm{margin-top:2mm;height:13mm;display:flex;flex-direction:column;justify-content:center;font-weight:700;line-height:1.2}
 .ic .nm div{white-space:nowrap}
 .ic .mt{font-size:8pt;margin-top:1.2mm;white-space:nowrap;overflow:hidden}
+/* 賞味期限の手書き欄（A4 6面だけ） */
+.ic .exp{position:absolute;left:0;right:0;top:28.2mm;height:8.4mm;border:0.4mm solid #000;display:flex;align-items:center;padding:0 2.5mm;font-size:11pt;font-weight:700;line-height:1;white-space:nowrap}
+.ic .exp .el{font-size:10.5pt;margin-right:auto}
+.ic .exp .b{display:inline-block;width:11mm;height:5.2mm;border-bottom:0.25mm solid #000;margin:0 1.2mm 0 2mm}
+.ic .exp .b.y{width:19mm}
 .ic .fl2{position:absolute;top:0;left:50%;transform:translateX(-50%);border:0.3mm solid #000;font-size:8pt;font-weight:700;padding:0.2mm 1.5mm}
 .ic svg{position:absolute;left:50%;transform:translateX(-50%);bottom:7mm}
 .ic .hri{position:absolute;left:0;right:0;bottom:0;text-align:center;font:12pt Helvetica,Arial,sans-serif;letter-spacing:1.6mm;line-height:1}
@@ -427,6 +432,7 @@ body.admin .adminbadge{display:inline-block}
 <li>バーコードの下の端から箱の底まで <b>約3cm（32mm前後）</b> あけます。</li>
 <li>箱の角からバーコードの外枠まで <b>2cm以上</b> あけます。</li>
 </ul>
+<p><b>賞味期限の欄</b>：A4 6面のITFラベルには「賞味期限　年　月　日」の欄があります。貼る前に、箱の賞味期限をペンで書き込んでください（44面にはありません）。</p>
 <p><b>A4 6面を普通紙に印刷して切るとき</b>：プレビューの上の「切り取り線も印刷する」にチェックを入れると、切る位置に点線が入ります。</p>
 <p><b>ITFを追加・直すとき（管理者だけ）</b>　右上の「管理者モード」をオンにしてから行います。</p>
 <ol>
@@ -841,6 +847,7 @@ function labelHtml(p){
     <div class="top"><span class="kd">${esc(p.k)}</span>${p.q!==""&&p.q!=null?`<span class="qt"><small>入数</small>${esc(p.q)}</span>`:""}</div>
     <div class="nm">${f.nm.lines.map(l=>`<div style="font-size:${f.nm.pt}pt">${esc(l)}</div>`).join("")}</div>
     <div class="mt">${p.c?"商品コード "+esc(p.c)+"　":""}JAN ${esc(p.j||"")}</div>
+    <div class="exp"><span class="el">賞味期限</span><span class="b y"></span>年<span class="b"></span>月<span class="b"></span>日</div>
     <svg style="width:${s.w.toFixed(2)}mm;height:${s.h.toFixed(2)}mm" viewBox="0 0 ${s.w} ${s.h}" preserveAspectRatio="none" shape-rendering="crispEdges"><use href="#${s.id}"/></svg>
     <div class="hri">${p.v}</div></div>`;
 }
