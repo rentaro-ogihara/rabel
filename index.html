@@ -116,6 +116,9 @@ summary{cursor:pointer;font-weight:700;font-size:15px}
 .sheet .hd .fl{border:0.3mm solid #000;padding:0.3mm 1mm;margin-right:2mm;font-weight:700}
 .sheet .pkhd{justify-content:flex-start}
 .sheet .pkn{display:inline-flex;align-items:center;justify-content:center;min-width:3.4mm;height:3.4mm;padding:0 .4mm;border-radius:1.7mm;background:#000;color:#fff;font-size:6.5pt;font-weight:700;line-height:1;margin-right:.6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet .ic .pkb{position:absolute;top:7.3mm;left:0;right:0;text-align:center;font-size:11pt;font-weight:700;line-height:1;pointer-events:none}
+.sheet .ic .pkb .pkn{min-width:6mm;height:6mm;border-radius:3mm;font-size:11pt;margin-right:1.2mm;vertical-align:middle}
+.sheet .ic.pkfirst .pkb{font-size:12pt}
 .sheet .pkm{position:absolute;left:4.5mm;width:3.6mm;display:flex;flex-direction:column;justify-content:center;gap:.6mm}
 .sheet .pkm .pkn{margin:0}
 .sheet .ft{position:absolute;right:8.4mm;bottom:4.6mm;font-size:7.5pt;line-height:1}
@@ -865,7 +868,7 @@ function buildPacked(){
   const slots=[]; let pos=0;
   cur().queue.forEach((x,qi)=>{
     if(pack.style==="row" && pos%m.cols!==0) pos+=m.cols-pos%m.cols;
-    for(let k=0;k<x.q;k++){ slots[pos]={v:x.v,no:qi+1,first:k===0}; pos++; }
+    for(let k=0;k<x.q;k++){ slots[pos]={v:x.v,no:qi+1,first:k===0,k:k+1,n:x.q}; pos++; }
   });
   const nPages=Math.max(1,Math.ceil(pos/P));
   const num=n=>`<span class="pkn">${n}</span>`;
@@ -876,7 +879,7 @@ function buildPacked(){
     for(let i=0;i<P;i++){
       const sl=slots[pi*P+i];
       const c=i%m.cols,r=Math.floor(i/m.cols),posS=`left:${(ML+c*m.w+ox).toFixed(2)}mm;top:${(MT+r*m.h+oy).toFixed(2)}mm;width:${m.w}mm;height:${m.h}mm`;
-      if(sl){ cells+=`<div class="${big?"ic":"lb"}" style="${posS}">${labelHtml(BY[mode][sl.v])}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
+      if(sl){ cells+=`<div class="${big?"ic":"lb"}${big&&sl.first?" pkfirst":""}" style="${posS}">${labelHtml(BY[mode][sl.v])}${big?`<div class="pkb">${sl.k}/${sl.n}</div>`:""}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
       else if(guide) cells+=`<div class="skipcell" style="${posS}"></div>`;
     }
     if(big){ // A4 6面は余白が無いので、番号や一覧は入れない（ラベルに商品名・入数が大きく入っている）
@@ -1108,7 +1111,7 @@ async function itfFromKenpin(d,items){
   });
   itfSize="6"; ls("ebl-bc-itfsize","6"); setMode("itf");
   ST.itf.queue=found.map(f=>({v:f.v,q:Math.min(9999,f.q)})); ST.itf.start=0;
-  pack={style:"tight", title:d.title||""};
+  pack={style:d.pack==="row"?"row":"tight", title:d.title||""};
   update();
   const list=found.map(f=>`<p><b>${esc(f._x.c)}</b>　${f._x.q}個 ÷ 入数${f._per} → <b>${f.q}枚</b></p>`).join("");
   let html=`<h3>ITF（外箱・A4 6面）を印刷します</h3><p>1箱に1枚、端数の箱にも1枚出します。<b>A4の6面シートを新しく1枚目から</b>入れてください。</p>
