@@ -648,7 +648,7 @@ function setMode(m){
   $("itfAdd").hidden=m!=="itf"; $("cutWrap").hidden=!(m==="itf"&&itfSize==="6");
   $("q").value=""; update(); $("q").focus();
 }
-$("modes").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b&&b.dataset.m!==mode)setMode(b.dataset.m)});
+$("modes").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b&&b.dataset.m!==mode){pack=null;setMode(b.dataset.m)}});
 
 /* ---------- 商品リスト ---------- */
 function visible(){const ks=$("q").value.split(/[\s　]+/).map(norm).filter(Boolean);return DB[mode].filter(p=>ks.every(k=>p._s.includes(k)))}
@@ -861,6 +861,7 @@ function buildPacked(){
   const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
   const ML=(210-m.cols*m.w)/2, MT=(297-m.rows*m.h)/2, P=m.per;
   // ラベルを1枚ずつ並べる（row：商品が変わったら次の行の左端から）
+  const big=mode==="itf"&&itfSize==="6";
   const slots=[]; let pos=0;
   cur().queue.forEach((x,qi)=>{
     if(pack.style==="row" && pos%m.cols!==0) pos+=m.cols-pos%m.cols;
@@ -875,8 +876,12 @@ function buildPacked(){
     for(let i=0;i<P;i++){
       const sl=slots[pi*P+i];
       const c=i%m.cols,r=Math.floor(i/m.cols),posS=`left:${(ML+c*m.w+ox).toFixed(2)}mm;top:${(MT+r*m.h+oy).toFixed(2)}mm;width:${m.w}mm;height:${m.h}mm`;
-      if(sl){ cells+=`<div class="lb" style="${posS}">${labelHtml(BY[mode][sl.v])}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
+      if(sl){ cells+=`<div class="${big?"ic":"lb"}" style="${posS}">${labelHtml(BY[mode][sl.v])}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
       else if(guide) cells+=`<div class="skipcell" style="${posS}"></div>`;
+    }
+    if(big){ // A4 6面は余白が無いので、番号や一覧は入れない（ラベルに商品名・入数が大きく入っている）
+      let deco=""; if($("cut").checked){for(let c=1;c<m.cols;c++)deco+=`<div class="cutv" style="left:${(ML+c*m.w+ox).toFixed(2)}mm"></div>`;for(let r=1;r<m.rows;r++)deco+=`<div class="cuth" style="top:${(MT+r*m.h+oy).toFixed(2)}mm"></div>`}
+      html+=`<div class="sheet${guide?" guide":""} m-${mode} packed">${deco}${cells}</div>`; continue;
     }
     // 左の余白：その行で始まる商品の番号
     for(let r=0;r<m.rows;r++){
@@ -893,7 +898,7 @@ function buildPacked(){
   scalePreview();
 }
 function buildSheets(){
-  if(pack && mode==="jan") return buildPacked();
+  if(pack) return buildPacked();
   const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
   const ML=(210-m.cols*m.w)/2, MT=(297-m.rows*m.h)/2, P=m.per;
   const pages=[];
@@ -1069,6 +1074,7 @@ async function fromKenpin(){
   let d; try{ d=JSON.parse(decodeURIComponent(m[1])); }catch(e){ return; }
   history.replaceState(null,"",location.pathname); // もう一度開いたときに二重に入らないように
   const items=(d.items||[]).filter(x=>x&&x.c&&x.q>0);
+  if(d.type==="itf") return itfFromKenpin(d,items);
   const found=[], missing=[];
   items.forEach(x=>{ const p=DB.jan.find(j=>j.c===x.c); if(p) found.push({v:p.v,q:Math.min(9999,x.q|0)}); else missing.push(x); });
   if(mode!=="jan") setMode("jan");
@@ -1081,6 +1087,35 @@ async function fromKenpin(){
       <div class="scroll">${missing.map(x=>`<p><b>${esc(x.c)}</b>　${esc(x.n||"")}　${x.q}枚</p>`).join("")}</div>
       ${found.length?"<p>ほかの商品は、このあと印刷画面を出します。</p>":""}`,[{t:found.length?"わかった（印刷へ進む）":"閉じる",v:"ok",main:1}]);
   }
+  if(!found.length) return;
+  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+  for(const k in fitCache)delete fitCache[k]; buildSheets();
+  setTimeout(()=>$("print").click(),300);
+}
+
+/* ITF：外箱のITFを、1箱1枚・端数の箱にも出す（A4 6面） */
+async function itfFromKenpin(d,items){
+  const found=[], noItf=[], noQ=[];
+  items.forEach(x=>{
+    const jan=x.j||((DB.jan.find(j=>j.c===x.c)||{}).v)||"";
+    const outer=DB.itf.filter(t=>t.k==="外箱");
+    const t=outer.find(t=>t.c&&t.c===x.c) || (jan?outer.find(t=>t.j===jan):null);
+    if(!t){ noItf.push(x); return; }
+    const per=parseInt(t.q,10);
+    if(!(per>0)){ noQ.push({...x,v:t.v}); return; }
+    const boxes=Math.ceil(x.q/per);
+    const prev=found.find(f=>f.v===t.v); if(prev) prev.q+=boxes; else found.push({v:t.v,q:boxes,_x:x,_per:per});
+  });
+  itfSize="6"; ls("ebl-bc-itfsize","6"); setMode("itf");
+  ST.itf.queue=found.map(f=>({v:f.v,q:Math.min(9999,f.q)})); ST.itf.start=0;
+  pack={style:"tight", title:d.title||""};
+  update();
+  const list=found.map(f=>`<p><b>${esc(f._x.c)}</b>　${f._x.q}個 ÷ 入数${f._per} → <b>${f.q}枚</b></p>`).join("");
+  let html=`<h3>ITF（外箱・A4 6面）を印刷します</h3><p>1箱に1枚、端数の箱にも1枚出します。<b>A4の6面シートを新しく1枚目から</b>入れてください。</p>
+    ${found.length?`<div class="scroll">${list}</div><p>合計 <b>${found.reduce((a,b)=>a+b.q,0)}枚</b>（${Math.ceil(found.reduce((a,b)=>a+b.q,0)/6)}シート）</p>`:"<p><b>ITFを印刷できる商品がありません。</b></p>"}`;
+  if(noQ.length) html+=`<p style="color:#b91c1c"><b>入数が登録されていないので出せません：</b>${noQ.map(x=>esc(x.c)).join("、")}</p>`;
+  if(noItf.length) html+=`<details><summary>ITFが登録されていない商品（${noItf.length}件・印刷されません）</summary><p class="note">${noItf.map(x=>esc(x.c)+" "+esc(x.n||"")).join("<br>")}</p></details>`;
+  await dialog(html,[{t:found.length?"印刷へ進む":"閉じる",v:"ok",main:1}]);
   if(!found.length) return;
   if(document.fonts&&document.fonts.ready) await document.fonts.ready;
   for(const k in fitCache)delete fitCache[k]; buildSheets();
