@@ -254,6 +254,34 @@ body:not(.admin) .admin-only,body:not(.admin) [data-flag],body:not(.admin) [data
 body.admin header.top{box-shadow:inset 0 -3px 0 #B42318}
 .adminbadge{display:none;background:#B42318;color:#fff;font-size:12px;font-weight:700;border-radius:3px;padding:1px 7px}
 body.admin .adminbadge{display:inline-block}
+
+/* ===== アルペン梱包明細（APラベル）A4 6面 105×99mm ===== */
+#apSheets{display:none}
+.aps{width:210mm;height:297mm;position:relative;overflow:hidden;background:#fff;color:#000;font-family:var(--font)}
+.aps .ap-cell{position:absolute;width:105mm;height:99mm}
+.aps .ap-frm{position:absolute;left:4mm;top:4mm;width:97mm;border:.3mm solid #000;box-sizing:content-box;margin:0;padding:0}
+.aps .ap-row{display:flex;flex-wrap:nowrap;gap:0;margin:0;padding:0;border-top:.25mm solid #000;box-sizing:border-box}
+.aps .ap-row:first-child{border-top:0}
+.aps .ap-hd{width:8mm;flex:none;margin:0;padding:0;border-right:.25mm solid #000;font-size:7.5pt;line-height:1.1;display:flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box}
+.aps .ap-hd.ap-sm{font-size:6.5pt}
+.aps .ap-bx{flex:none;margin:0;padding:0;border-left:.25mm solid #000;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15pt;box-sizing:border-box}
+.aps .ap-hd+.ap-bx{border-left:0}
+.aps .ap-bx.ap-lab{font-size:6pt;font-weight:400;line-height:1.05;text-align:center}
+.aps .ap-nm{flex:1;display:flex;align-items:center;padding:0 3mm;font-weight:700;font-size:17pt;line-height:1.2;overflow:hidden}
+.aps .ap-sz{flex:none;border-left:.25mm solid #000;display:flex;flex-direction:column;box-sizing:border-box}
+.aps .ap-szt{height:7mm;border-bottom:.25mm solid #000;font-size:5.6pt;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.aps .ap-szb{flex:1;display:flex;align-items:center;font-size:13pt;font-weight:700}
+.aps .ap-szb span{display:inline-block;text-align:center}
+.aps .ap-bc{flex:none;border-left:.25mm solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6mm;box-sizing:border-box;overflow:hidden}
+.aps .ap-bc svg{display:block}
+.aps .ap-hr{font:7.5pt Consolas,"Courier New",monospace;letter-spacing:.5mm;line-height:1}
+@media screen{body.show-ap #apSheets{display:block;position:fixed;left:-9999px;top:0}}
+@media print{
+  body.print-ap .wrap,body.print-ap header.top,body.print-ap .modes,body.print-ap .modal{display:none!important}
+  body.print-ap #apSheets{display:block!important;position:static}
+  .aps{page-break-after:always;break-after:page}
+  .aps:last-child{page-break-after:auto;break-after:auto}
+}
 </style>
 </head>
 <body>
@@ -1195,6 +1223,7 @@ async function fromKenpin(){
   history.replaceState(null,"",location.pathname); // もう一度開いたときに二重に入らないように
   const items=(d.items||[]).filter(x=>x&&x.c&&x.q>0);
   if(d.type==="itf") return itfFromKenpin(d,items);
+  if(d.type==="ap") return apFromKenpin(d);
   const found=[], missing=[];
   items.forEach(x=>{ const p=DB.jan.find(j=>j.c===x.c); if(p) found.push({v:p.v,q:Math.min(9999,x.q|0)}); else missing.push(x); });
   if(mode!=="jan") setMode("jan");
@@ -1213,6 +1242,54 @@ async function fromKenpin(){
   setTimeout(()=>$("print").click(),300);
 }
 
+
+/* ---------- アルペン梱包明細（APラベル）：まとめ検品君から type:"ap" で受け取る ---------- */
+const C39={'0':'000110100','1':'100100001','2':'001100001','3':'101100000','4':'000110001','5':'100110000','6':'001110000','7':'000100101','8':'100100100','9':'001100100','*':'010010100','-':'010000101','A':'100001001','B':'001001001','C':'101001000','D':'000011001','E':'100011000','F':'001011000','G':'000001101','H':'100001100','I':'001001100','J':'000011100','K':'100000011','L':'001000011','M':'101000010','N':'000010011','O':'100010010','P':'001010010','Q':'000000111','R':'100000110','S':'001000110','T':'000010110','U':'100010100','V':'001010100','W':'110000001','X':'011000001','Y':'111000000','Z':'010010001',' ':'011000100'};
+function code39Svg(text,h){
+  const N=0.21,R=2.5,Q=2.1, s="*"+String(text).toUpperCase().replace(/[^0-9A-Z\- ]/g,"")+"*";
+  let x=Q, r="";
+  [...s].forEach((ch,ci)=>{ const pat=C39[ch]; [...pat].forEach((w,i)=>{ const ww=N*(w==="1"?R:1); if(i%2===0) r+=`<rect x="${x.toFixed(4)}" y="0" width="${ww.toFixed(4)}" height="${h}"/>`; x+=ww; }); if(ci<s.length-1) x+=N; });
+  const W=x+Q;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(3)}mm" height="${h}mm" viewBox="0 0 ${W.toFixed(4)} ${h}" shape-rendering="crispEdges">${r}</svg>`;
+}
+function apLabelHtml(d){
+  const U=89/70;
+  const bx=(v,n,w,dash)=>{ const c=[...String(v||"")]; let o=""; for(let i=0;i<n;i++){ let ch; if(dash!=null&&i===dash) ch="－"; else { const k=(dash==null||i<dash)?i:i-1; ch=c[k]||""; } o+=`<div class="ap-bx" style="width:${(w*U).toFixed(3)}mm">${esc(ch)}</div>`; } return o; };
+  const sp=w=>`width:${(w*U).toFixed(3)}mm`;
+  return `<div class="ap-frm">
+ <div class="ap-row" style="height:18mm"><div class="ap-hd">J<br>A<br>N</div>${bx(d.j,14,5,7)}</div>
+ <div class="ap-row" style="height:17mm"><div class="ap-hd ap-sm">コ<br>ー<br>ド<br>No.</div>${bx(d.c,10,7)}</div>
+ <div class="ap-row" style="height:17mm"><div class="ap-hd">品<br><br>名</div><div class="ap-nm">${esc(d.n||"")}</div></div>
+ <div class="ap-row" style="height:18mm"><div class="ap-hd">サ<br>イ<br>ズ</div>${bx(d.s,3,7)}
+  <div class="ap-sz" style="${sp(49)}"><div class="ap-szt">インナーカートンの入数　×　インナーカートン数　＝　総数</div>
+  <div class="ap-szb"><span style="${sp(14)}"></span><span style="${sp(6)}">×</span><span style="${sp(12)}"></span><span style="${sp(6)}">＝</span><span style="${sp(11)}"></span></div></div></div>
+ <div class="ap-row" style="height:21mm"><div class="ap-hd">カ<br>ラ<br>ー</div>${bx(d.k,4,7)}
+  <div class="ap-bx ap-lab" style="${sp(5)}">出<br>庫<br>単<br>位</div><div class="ap-bx" style="${sp(5)}"></div>
+  <div class="ap-bc" style="${sp(32)}">${d.c?code39Svg(d.c,10.5):""}<div class="ap-hr">${esc(d.c||"")}</div></div></div>
+</div>`;
+}
+function buildApSheets(items){
+  // 商品ごとに改ページ：商品が変わったら新しいシートの1面目から
+  const pages=[];
+  items.forEach(it=>{ const n=(it.b|0)*(it.per|0||2); let cur=null; for(let i=0;i<n;i++){ if(!cur||cur.length===6){ cur=[]; pages.push(cur); } cur.push(it); } });
+  $("apSheets").innerHTML=pages.map(pg=>`<div class="aps">${pg.map((d,i)=>`<div class="ap-cell" style="left:${(i%2)*105}mm;top:${Math.floor(i/2)*99}mm">${apLabelHtml(d)}</div>`).join("")}</div>`).join("");
+  return pages.length;
+}
+async function apFromKenpin(d){
+  const items=(d.items||[]).filter(x=>x&&x.c&&(x.b|0)>0);
+  const n=buildApSheets(items);
+  const tot=items.reduce((a,x)=>a+(x.b|0)*(x.per|0||2),0);
+  const list=items.map(x=>`<p><b>${esc(x.c)}</b>　${esc(x.n||"")}<br><span class="note">${x.b}箱 × ${x.per||2}枚 ＝ <b>${(x.b|0)*(x.per|0||2)}枚</b></span></p>`).join("");
+  const a=await dialog(`<h3>アルペン梱包明細（APラベル・A4 6面）を印刷します</h3>
+    <p>${esc(d.title||"")}</p><p>1箱に2枚（メイン面・サイド面）。<b>商品が変わると次のシートから</b>印刷します。<br><b>A4の6面シートを新しく1枚目から</b>入れてください。</p>
+    <div class="scroll">${list}</div><p>合計 <b>${tot}枚</b>（<b>${n}シート</b>）</p>
+    <p class="note">印刷画面では「倍率100%（実際のサイズ）」「余白なし」のまま印刷してください。</p>`,[{t:"やめる",v:"no"},{t:"印刷へ進む",v:"ok",main:1}]);
+  if(a!=="ok"||!n) return;
+  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+  document.body.classList.add("print-ap");
+  setTimeout(()=>window.print(),200);
+}
+window.addEventListener("afterprint",()=>document.body.classList.remove("print-ap"));
 /* ITF：外箱のITFを、1箱1枚・端数の箱にも出す（A4 6面） */
 async function itfFromKenpin(d,items){
   const found=[], noItf=[], noQ=[];
@@ -1258,5 +1335,6 @@ if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch
 boot();
 (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{for(const k in fitCache)delete fitCache[k];buildSheets()});
 </script>
+<div id="apSheets"></div>
 </body>
 </html>
