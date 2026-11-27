@@ -180,6 +180,10 @@ summary{cursor:pointer;font-weight:700;font-size:15px}
 .ic .kd{border:0.4mm solid #000;font-weight:700;font-size:13pt;padding:0.6mm 2.5mm;line-height:1.2}
 .ic .qt{font-size:17pt;font-weight:700;line-height:1}
 .ic .qt small{font-size:10pt;font-weight:400;margin-right:1.5mm}
+/* 端数の箱：入数に斜め線を引き、実際の個数を書く */
+.ic .qt .qx{position:relative;display:inline-block;padding:0 .8mm;font-weight:400}
+.ic .qt .qx::after{content:"";position:absolute;left:-1mm;right:-1mm;top:50%;border-top:0.6mm solid #000;transform:rotate(-35deg)}
+.ic .qt .qa{display:inline-block;margin-left:2mm;font-size:20pt;font-weight:900;border:0.5mm solid #000;border-radius:1mm;padding:0 1.5mm;line-height:1.05}
 .ic .nm{margin-top:2mm;height:13mm;display:flex;flex-direction:column;justify-content:center;font-weight:700;line-height:1.2}
 .ic .nm div{white-space:nowrap}
 .ic .mt{font-size:8pt;margin-top:1.2mm;white-space:nowrap;overflow:hidden}
@@ -188,6 +192,7 @@ summary{cursor:pointer;font-weight:700;font-size:15px}
 .ic .exp .el{font-size:10.5pt;margin-right:auto}
 .ic .exp .b{display:inline-block;width:11mm;height:5.2mm;border-bottom:0.25mm solid #000;margin:0 1.2mm 0 2mm}
 .ic .exp .b.y{width:19mm}
+.ic .exp .b{text-align:center;font-size:13pt;line-height:5.2mm;vertical-align:bottom}
 .ic .fl2{position:absolute;top:0;left:50%;transform:translateX(-50%);border:0.3mm solid #000;font-size:8pt;font-weight:700;padding:0.2mm 1.5mm}
 .ic svg{position:absolute;left:50%;transform:translateX(-50%);bottom:7mm}
 .ic .hri{position:absolute;left:0;right:0;bottom:0;text-align:center;font:12pt Helvetica,Arial,sans-serif;letter-spacing:1.6mm;line-height:1}
@@ -908,7 +913,7 @@ function fitFor(p){
 
 /* ---------- シート生成 ---------- */
 function clampOff(v){v=parseFloat(v)||0;return Math.max(-10,Math.min(10,v))}
-function labelHtml(p){
+function labelHtml(p,ex){ // ex＝賞味期限 {y,m,d}（まとめ検品君からITFを印刷したときだけ）
   const f=fitFor(p);
   if(mode==="jan"){
     const sid=eanSymbol(p.v);
@@ -929,14 +934,23 @@ function labelHtml(p){
   }
   const s=itfSymbol(p.v);
   return `<div class="in">${p.f?'<div class="fl2">要確認</div>':""}
-    <div class="top"><span class="kd">${esc(p.k)}</span>${p.q!==""&&p.q!=null?`<span class="qt"><small>入数</small>${esc(p.q)}</span>`:""}</div>
+    <div class="top"><span class="kd">${esc(p.k)}</span>${p.q!==""&&p.q!=null?(ex&&ex.act!=null&&ex.act<+p.q?`<span class="qt"><small>入数</small><span class="qx">${esc(p.q)}</span><span class="qa">${ex.act}</span></span>`:`<span class="qt"><small>入数</small>${esc(p.q)}</span>`):""}</div>
     <div class="nm">${f.nm.lines.map(l=>`<div style="font-size:${f.nm.pt}pt">${esc(l)}</div>`).join("")}</div>
     <div class="mt">${p.c?"商品コード "+esc(p.c)+"　":""}JAN ${esc(p.j||"")}</div>
-    <div class="exp"><span class="el">賞味期限</span><span class="b y"></span>年<span class="b"></span>月<span class="b"></span>日</div>
+    <div class="exp"><span class="el">賞味期限</span><span class="b y">${ex&&ex.y?ex.y:""}</span>年<span class="b">${ex&&ex.m?ex.m:""}</span>月<span class="b">${ex&&ex.d?ex.d:""}</span>日</div>
     <svg style="width:${s.w.toFixed(2)}mm;height:${s.h.toFixed(2)}mm" viewBox="0 0 ${s.w} ${s.h}" preserveAspectRatio="none" shape-rendering="crispEdges"><use href="#${s.id}"/></svg>
     <div class="hri">${p.v}</div></div>`;
 }
 /* ---------- まとめ検品君から開いたとき：詰めて印刷 ---------- */
+function expParts(d){ const m=String(d||"").match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); return m?{y:m[1],m:+m[2],d:+m[3]}:null; }
+/* 箱の分け方：賞味期限がちがう物は同じ箱に入れない。期限ごとに 入数 で箱を作り、端数は端数の箱にする
+   例）08/31が9個・09/30が30個・入数18 → [08/31の9個][09/30の18個][09/30の12個] */
+function boxPlan(exps,qty,per){
+  const list=(exps&&exps.length?exps.map(([d,q])=>({d,q:+q||0})):[{d:"",q:qty}]).filter(x=>x.q>0).sort((a,b)=>a.d<b.d?-1:1);
+  const out=[];
+  list.forEach(x=>{ let r=x.q; while(r>0){ const n=Math.min(per,r); out.push({d:x.d,n}); r-=n; } });
+  return out;
+}
 let pack=null; // {style:"row"|"tight", title, items:[{v,c,n,q,no}]}
 function buildPacked(){
   const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
@@ -946,7 +960,7 @@ function buildPacked(){
   const slots=[]; let pos=0;
   cur().queue.forEach((x,qi)=>{
     if(pack.style==="row" && pos%m.cols!==0) pos+=m.cols-pos%m.cols;
-    for(let k=0;k<x.q;k++){ slots[pos]={v:x.v,no:qi+1,first:k===0,k:k+1,n:x.q}; pos++; }
+    for(let k=0;k<x.q;k++){ const bx=x.boxes?x.boxes[k]:null; slots[pos]={v:x.v,no:qi+1,first:k===0,k:k+1,n:x.q,d:bx?bx.d:"",act:bx?bx.n:null}; pos++; }
   });
   const nPages=Math.max(1,Math.ceil(pos/P));
   const num=n=>`<span class="pkn">${n}</span>`;
@@ -957,7 +971,7 @@ function buildPacked(){
     for(let i=0;i<P;i++){
       const sl=slots[pi*P+i];
       const c=i%m.cols,r=Math.floor(i/m.cols),posS=`left:${(ML+c*m.w+ox).toFixed(2)}mm;top:${(MT+r*m.h+oy).toFixed(2)}mm;width:${m.w}mm;height:${m.h}mm`;
-      if(sl){ cells+=`<div class="${big?"ic":"lb"}${big&&sl.first?" pkfirst":""}" style="${posS}">${labelHtml(BY[mode][sl.v])}${big?`<div class="pkb">${sl.k}/${sl.n}</div>`:""}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
+      if(sl){ cells+=`<div class="${big?"ic":"lb"}${big&&sl.first?" pkfirst":""}" style="${posS}">${labelHtml(BY[mode][sl.v],big?{...(expParts(sl.d)||{}),act:sl.act}:null)}${big?`<div class="pkb">${sl.k}/${sl.n}</div>`:""}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
       else if(guide) cells+=`<div class="skipcell" style="${posS}"></div>`;
     }
     if(big){ // A4 6面は余白が無いので、番号や一覧は入れない（ラベルに商品名・入数が大きく入っている）
@@ -1300,14 +1314,15 @@ async function itfFromKenpin(d,items){
     if(!t){ noItf.push(x); return; }
     const per=parseInt(t.q,10);
     if(!(per>0)){ noQ.push({...x,v:t.v}); return; }
-    const boxes=Math.ceil(x.q/per);
-    const prev=found.find(f=>f.v===t.v); if(prev) prev.q+=boxes; else found.push({v:t.v,q:boxes,_x:x,_per:per});
+    const plan=boxPlan(x.e,x.q,per), boxes=plan.length;
+    const prev=found.find(f=>f.v===t.v); if(prev){ prev.q+=boxes; prev.boxes=prev.boxes.concat(plan); } else found.push({v:t.v,q:boxes,_x:x,_per:per,boxes:plan});
   });
   itfSize="6"; ls("ebl-bc-itfsize","6"); setMode("itf");
-  ST.itf.queue=found.map(f=>({v:f.v,q:Math.min(9999,f.q)})); ST.itf.start=0;
+  ST.itf.queue=found.map(f=>({v:f.v,q:Math.min(9999,f.q),boxes:f.boxes})); ST.itf.start=0;
   pack={style:d.pack==="row"?"row":"tight", title:d.title||""};
   update();
-  const list=found.map(f=>`<p><b>${esc(f._x.c)}</b>　${f._x.q}個 ÷ 入数${f._per} → <b>${f.q}枚</b></p>`).join("");
+  const bsum=f=>f.boxes.map(b=>`[${b.d?esc(b.d.replace(/^\d{4}\//,"")):"期限なし"}${b.n<f._per?" <b>端数"+b.n+"個</b>":" "+b.n+"個"}]`).join(" ");
+  const list=found.map(f=>`<p><b>${esc(f._x.c)}</b>　${f._x.q}個・入数${f._per} → <b>${f.q}枚</b><br><span class="note">${bsum(f)}</span></p>`).join("");
   let html=`<h3>ITF（外箱・A4 6面）を印刷します</h3><p>1箱に1枚、端数の箱にも1枚出します。<b>A4の6面シートを新しく1枚目から</b>入れてください。</p>
     ${found.length?`<div class="scroll">${list}</div><p>合計 <b>${found.reduce((a,b)=>a+b.q,0)}枚</b>（${pack.style==="row"?Math.ceil(found.reduce((a,b)=>a+Math.ceil(b.q/2),0)/3):Math.ceil(found.reduce((a,b)=>a+b.q,0)/6)}シート）</p>`:"<p><b>ITFを印刷できる商品がありません。</b></p>"}`;
   if(noQ.length) html+=`<p style="color:#b91c1c"><b>入数が登録されていないので出せません：</b>${noQ.map(x=>esc(x.c)).join("、")}</p>`;

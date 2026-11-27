@@ -1,5 +1,5 @@
 // 画面（index.html など）は通信できれば最新を取り、商品データ（data.json）は毎回ネットから読み込む
-const CACHE = "label-print-v7";
+const CACHE = "label-print-v9";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
