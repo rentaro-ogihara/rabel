@@ -114,6 +114,13 @@ summary{cursor:pointer;font-weight:700;font-size:15px}
 .sheet .hd{position:absolute;left:8.4mm;right:8.4mm;top:4.6mm;display:flex;justify-content:space-between;font-size:8.5pt;line-height:1;white-space:nowrap}
 .sheet .hd .hn{font-weight:700;overflow:hidden;text-overflow:ellipsis;margin-right:4mm}
 .sheet .hd .fl{border:0.3mm solid #000;padding:0.3mm 1mm;margin-right:2mm;font-weight:700}
+.sheet .pkhd{justify-content:flex-start}
+.sheet .pkn{display:inline-flex;align-items:center;justify-content:center;min-width:3.4mm;height:3.4mm;padding:0 .4mm;border-radius:1.7mm;background:#000;color:#fff;font-size:6.5pt;font-weight:700;line-height:1;margin-right:.6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet .ic .pkb{position:absolute;top:7.3mm;left:0;right:0;text-align:center;font-size:11pt;font-weight:700;line-height:1;pointer-events:none}
+.sheet .ic .pkb .pkn{min-width:6mm;height:6mm;border-radius:3mm;font-size:11pt;margin-right:1.2mm;vertical-align:middle}
+.sheet .ic.pkfirst .pkb{font-size:12pt}
+.sheet .pkm{position:absolute;left:4.5mm;width:3.6mm;display:flex;flex-direction:column;justify-content:center;gap:.6mm}
+.sheet .pkm .pkn{margin:0}
 .sheet .ft{position:absolute;right:8.4mm;bottom:4.6mm;font-size:7.5pt;line-height:1}
 .lb{position:absolute;width:48.3mm;height:25.4mm;overflow:hidden}
 .lb .t{position:absolute;left:2mm;right:2mm;top:1.3mm;height:6.8mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.15}
@@ -668,7 +675,7 @@ function setMode(m){
   $("itfAdd").hidden=m!=="itf"; $("qtyAll").hidden=m!=="itf"; $("cutWrap").hidden=!(m==="itf"&&itfSize==="6");
   $("q").value=""; update(); $("q").focus();
 }
-$("modes").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b&&b.dataset.m!==mode)setMode(b.dataset.m)});
+$("modes").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b&&b.dataset.m!==mode){pack=null;setMode(b.dataset.m)}});
 
 /* ---------- 商品リスト ---------- */
 function visible(){const ks=$("q").value.split(/[\s　]+/).map(norm).filter(Boolean);return DB[mode].filter(p=>ks.every(k=>p._s.includes(k)))}
@@ -700,7 +707,7 @@ $("addAll").onclick=async()=>{
   }
   v.forEach(p=>cur().queue.push({v:p.v,q:M().per})); update();
 };
-$("clear").onclick=()=>{cur().queue=[];update()};
+$("clear").onclick=()=>{cur().queue=[];pack=null;update()};
 
 /* ---------- 選んだ商品 ---------- */
 function sheetsOf(q,s0){const P=M().per;const first=Math.min(q,P-s0);return 1+Math.ceil((q-first)/P)}
@@ -901,7 +908,50 @@ function labelHtml(p){
     <svg style="width:${s.w.toFixed(2)}mm;height:${s.h.toFixed(2)}mm" viewBox="0 0 ${s.w} ${s.h}" preserveAspectRatio="none" shape-rendering="crispEdges"><use href="#${s.id}"/></svg>
     <div class="hri">${p.v}</div></div>`;
 }
+/* ---------- まとめ検品君から開いたとき：詰めて印刷 ---------- */
+let pack=null; // {style:"row"|"tight", title, items:[{v,c,n,q,no}]}
+function buildPacked(){
+  const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
+  const ML=(210-m.cols*m.w)/2, MT=(297-m.rows*m.h)/2, P=m.per;
+  // ラベルを1枚ずつ並べる（row：商品が変わったら次の行の左端から）
+  const big=mode==="itf"&&itfSize==="6";
+  const slots=[]; let pos=0;
+  cur().queue.forEach((x,qi)=>{
+    if(pack.style==="row" && pos%m.cols!==0) pos+=m.cols-pos%m.cols;
+    for(let k=0;k<x.q;k++){ slots[pos]={v:x.v,no:qi+1,first:k===0,k:k+1,n:x.q}; pos++; }
+  });
+  const nPages=Math.max(1,Math.ceil(pos/P));
+  const num=n=>`<span class="pkn">${n}</span>`;
+  let html="";
+  for(let pi=0;pi<nPages;pi++){
+    let cells="", marks="";
+    const onPage=new Map();
+    for(let i=0;i<P;i++){
+      const sl=slots[pi*P+i];
+      const c=i%m.cols,r=Math.floor(i/m.cols),posS=`left:${(ML+c*m.w+ox).toFixed(2)}mm;top:${(MT+r*m.h+oy).toFixed(2)}mm;width:${m.w}mm;height:${m.h}mm`;
+      if(sl){ cells+=`<div class="${big?"ic":"lb"}${big&&sl.first?" pkfirst":""}" style="${posS}">${labelHtml(BY[mode][sl.v])}${big?`<div class="pkb">${sl.k}/${sl.n}</div>`:""}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
+      else if(guide) cells+=`<div class="skipcell" style="${posS}"></div>`;
+    }
+    if(big){ // A4 6面は余白が無いので、番号や一覧は入れない（ラベルに商品名・入数が大きく入っている）
+      let deco=""; if($("cut").checked){for(let c=1;c<m.cols;c++)deco+=`<div class="cutv" style="left:${(ML+c*m.w+ox).toFixed(2)}mm"></div>`;for(let r=1;r<m.rows;r++)deco+=`<div class="cuth" style="top:${(MT+r*m.h+oy).toFixed(2)}mm"></div>`}
+      html+=`<div class="sheet${guide?" guide":""} m-${mode} packed">${deco}${cells}</div>`; continue;
+    }
+    // 左の余白：その行で始まる商品の番号
+    for(let r=0;r<m.rows;r++){
+      const starts=[];
+      for(let c=0;c<m.cols;c++){ const sl=slots[pi*P+r*m.cols+c]; if(sl && (sl.first || (r===0&&c===0))) starts.push(sl.no); }
+      // 1行目の左上は、前のシートからの続きも番号を出す
+      if(starts.length) marks+=`<div class="pkm" style="top:${(MT+r*m.h+oy).toFixed(2)}mm;height:${m.h}mm">${[...new Set(starts)].map(t=>num(t)).join("")}</div>`;
+    }
+    const legend=[...onPage.entries()].map(([no,cnt])=>{const x=cur().queue[no-1],p=BY[mode][x.v];return `${num(no)}${esc(p.c||"")} ${cnt}枚`}).join("　");
+    html+=`<div class="sheet${guide?" guide":""} m-${mode} packed"><div class="hd pkhd"><span class="hn">${pack.title?esc(pack.title)+"　":""}${legend}</span></div><div class="ft">${pi+1} / ${nPages}</div>${marks}${cells}</div>`;
+  }
+  $("sheets").innerHTML=html;
+  $("pvinfo").textContent=nPages>3?`プレビューは最初の3ページだけ表示しています（全${nPages}ページ印刷されます）。`:"";
+  scalePreview();
+}
 function buildSheets(){
+  if(pack) return buildPacked();
   const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
   const ML=(210-m.cols*m.w)/2, MT=(297-m.rows*m.h)/2, P=m.per;
   const pages=[];
@@ -959,7 +1009,7 @@ window.addEventListener("afterprint",async()=>{
   if(document.body.classList.contains("print-manual")){document.body.classList.remove("print-manual");return}
   if(!printingLabels) return; printingLabels=false;
   const a=await dialog(`<h3>印刷画面を閉じました</h3><p>次に使う人がまちがえないように、えらんだ商品を外しておきますか？</p>`,[{t:"このまま残す",v:"keep"},{t:"外す（おすすめ）",v:"clear",main:1}]);
-  if(a==="clear"){cur().queue=[];cur().start=0;$("q").value="";update();$("q").focus()}
+  if(a==="clear"){cur().queue=[];cur().start=0;pack=null;$("q").value="";update();$("q").focus()}
 });
 
 /* ---------- CSV 読み込み（JANとFNSKU） ---------- */
@@ -1138,6 +1188,59 @@ $("manual").addEventListener("click",e=>{if(e.target===$("manual"))closeManual()
 $("manual").querySelectorAll('.man nav a').forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const t=document.getElementById(a.getAttribute("href").slice(1));t&&t.scrollIntoView({behavior:"smooth"})}));
 $("manPrint").onclick=()=>{document.body.classList.add("print-manual");window.print();setTimeout(()=>document.body.classList.remove("print-manual"),1000)};
 
+/* ---------- まとめ検品君からの受け取り（#kenpin=…） ---------- */
+async function fromKenpin(){
+  const m=location.hash.match(/^#kenpin=(.+)$/); if(!m) return;
+  let d; try{ d=JSON.parse(decodeURIComponent(m[1])); }catch(e){ return; }
+  history.replaceState(null,"",location.pathname); // もう一度開いたときに二重に入らないように
+  const items=(d.items||[]).filter(x=>x&&x.c&&x.q>0);
+  if(d.type==="itf") return itfFromKenpin(d,items);
+  const found=[], missing=[];
+  items.forEach(x=>{ const p=DB.jan.find(j=>j.c===x.c); if(p) found.push({v:p.v,q:Math.min(9999,x.q|0)}); else missing.push(x); });
+  if(mode!=="jan") setMode("jan");
+  ST.jan.queue=found; ST.jan.start=0;
+  pack={style:d.pack==="tight"?"tight":"row", title:d.title||""};
+  update();
+  if(missing.length){
+    await dialog(`<h3 style="color:#b91c1c">JANが登録されていない商品があります</h3>
+      <p>次の商品はこのツールにJANが無いので、<b>シールが印刷されません</b>。手書きや別の方法で用意してください。</p>
+      <div class="scroll">${missing.map(x=>`<p><b>${esc(x.c)}</b>　${esc(x.n||"")}　${x.q}枚</p>`).join("")}</div>
+      ${found.length?"<p>ほかの商品は、このあと印刷画面を出します。</p>":""}`,[{t:found.length?"わかった（印刷へ進む）":"閉じる",v:"ok",main:1}]);
+  }
+  if(!found.length) return;
+  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+  for(const k in fitCache)delete fitCache[k]; buildSheets();
+  setTimeout(()=>$("print").click(),300);
+}
+
+/* ITF：外箱のITFを、1箱1枚・端数の箱にも出す（A4 6面） */
+async function itfFromKenpin(d,items){
+  const found=[], noItf=[], noQ=[];
+  items.forEach(x=>{
+    const jan=x.j||((DB.jan.find(j=>j.c===x.c)||{}).v)||"";
+    const outer=DB.itf.filter(t=>t.k==="外箱");
+    const t=outer.find(t=>t.c&&t.c===x.c) || (jan?outer.find(t=>t.j===jan):null);
+    if(!t){ noItf.push(x); return; }
+    const per=parseInt(t.q,10);
+    if(!(per>0)){ noQ.push({...x,v:t.v}); return; }
+    const boxes=Math.ceil(x.q/per);
+    const prev=found.find(f=>f.v===t.v); if(prev) prev.q+=boxes; else found.push({v:t.v,q:boxes,_x:x,_per:per});
+  });
+  itfSize="6"; ls("ebl-bc-itfsize","6"); setMode("itf");
+  ST.itf.queue=found.map(f=>({v:f.v,q:Math.min(9999,f.q)})); ST.itf.start=0;
+  pack={style:d.pack==="row"?"row":"tight", title:d.title||""};
+  update();
+  const list=found.map(f=>`<p><b>${esc(f._x.c)}</b>　${f._x.q}個 ÷ 入数${f._per} → <b>${f.q}枚</b></p>`).join("");
+  let html=`<h3>ITF（外箱・A4 6面）を印刷します</h3><p>1箱に1枚、端数の箱にも1枚出します。<b>A4の6面シートを新しく1枚目から</b>入れてください。</p>
+    ${found.length?`<div class="scroll">${list}</div><p>合計 <b>${found.reduce((a,b)=>a+b.q,0)}枚</b>（${pack.style==="row"?Math.ceil(found.reduce((a,b)=>a+Math.ceil(b.q/2),0)/3):Math.ceil(found.reduce((a,b)=>a+b.q,0)/6)}シート）</p>`:"<p><b>ITFを印刷できる商品がありません。</b></p>"}`;
+  if(noQ.length) html+=`<p style="color:#b91c1c"><b>入数が登録されていないので出せません：</b>${noQ.map(x=>esc(x.c)).join("、")}</p>`;
+  if(noItf.length) html+=`<details><summary>ITFが登録されていない商品（${noItf.length}件・印刷されません）</summary><p class="note">${noItf.map(x=>esc(x.c)+" "+esc(x.n||"")).join("<br>")}</p></details>`;
+  await dialog(html,[{t:found.length?"印刷へ進む":"閉じる",v:"ok",main:1}]);
+  if(!found.length) return;
+  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+  for(const k in fitCache)delete fitCache[k]; buildSheets();
+  setTimeout(()=>$("print").click(),300);
+}
 /* ---------- 起動 ---------- */
 async function boot(){
   try{
@@ -1146,6 +1249,7 @@ async function boot(){
     if(!got){const r=await fetch("data.json",{cache:"no-store"}); if(!r.ok) throw new Error(r.status); got=await r.json()}
     DB=got; loadedUpdated=DB.updated||null; DB.jan=DB.jan||[];DB.fba=DB.fba||[];DB.itf=DB.itf||[];
     reindex(); setMode(mode);
+    await fromKenpin();
   }catch(e){
     $("list").innerHTML=`<div class="empty">商品データを読み込めませんでした。<br>ネットにつながっているか確かめて、ツールを開き直してください。</div>`;
   }
