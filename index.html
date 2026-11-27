@@ -114,13 +114,6 @@ summary{cursor:pointer;font-weight:700;font-size:15px}
 .sheet .hd{position:absolute;left:8.4mm;right:8.4mm;top:4.6mm;display:flex;justify-content:space-between;font-size:8.5pt;line-height:1;white-space:nowrap}
 .sheet .hd .hn{font-weight:700;overflow:hidden;text-overflow:ellipsis;margin-right:4mm}
 .sheet .hd .fl{border:0.3mm solid #000;padding:0.3mm 1mm;margin-right:2mm;font-weight:700}
-.sheet .pkhd{justify-content:flex-start}
-.sheet .pkn{display:inline-flex;align-items:center;justify-content:center;min-width:3.4mm;height:3.4mm;padding:0 .4mm;border-radius:1.7mm;background:#000;color:#fff;font-size:6.5pt;font-weight:700;line-height:1;margin-right:.6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.sheet .ic .pkb{position:absolute;top:7.3mm;left:0;right:0;text-align:center;font-size:11pt;font-weight:700;line-height:1;pointer-events:none}
-.sheet .ic .pkb .pkn{min-width:6mm;height:6mm;border-radius:3mm;font-size:11pt;margin-right:1.2mm;vertical-align:middle}
-.sheet .ic.pkfirst .pkb{font-size:12pt}
-.sheet .pkm{position:absolute;left:4.5mm;width:3.6mm;display:flex;flex-direction:column;justify-content:center;gap:.6mm}
-.sheet .pkm .pkn{margin:0}
 .sheet .ft{position:absolute;right:8.4mm;bottom:4.6mm;font-size:7.5pt;line-height:1}
 .lb{position:absolute;width:48.3mm;height:25.4mm;overflow:hidden}
 .lb .t{position:absolute;left:2mm;right:2mm;top:1.3mm;height:6.8mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.15}
@@ -234,6 +227,20 @@ h2 .no{background:var(--mc);color:#fff}
 .mk.fba{background:#C2410C}.mk.itf{background:#2F7D4F}
 .mk span{color:#fff;font:700 7pt Helvetica,Arial,sans-serif;writing-mode:vertical-rl;letter-spacing:0.6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 
+/* 入数をその場で直す（管理者モード・ITFだけ） */
+.qedit{display:flex;align-items:center;gap:6px;margin-top:6px;padding:6px 8px;border:1.5px dashed #B42318;border-radius:4px;font-size:14px}
+.qedit input{width:70px;font-size:17px;text-align:right;padding:4px 6px}
+.qedit .note{margin:0}
+.qtab{width:100%;border-collapse:collapse;font-size:14px}
+.qtab th,.qtab td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:middle}
+.qtab th{position:sticky;top:0;background:var(--panel);font-size:12.5px;color:var(--sub)}
+.qtab td.n{font-weight:700}
+.qtab td.k{white-space:nowrap}
+.qtab input{width:72px;font-size:16px;text-align:right;padding:4px 6px}
+.qtab tr.chg td{background:var(--sel)}
+.qtab tr.chg input{border-color:#B42318;border-width:2px}
+.qscroll{max-height:56vh;overflow:auto;border:1px solid var(--line);border-radius:4px;margin-top:8px}
+.ghstate{font-size:12.5px;color:var(--sub)}
 /* 管理者モード：ふだんは商品データを変えるボタンを出さない */
 body:not(.admin) .admin-only,body:not(.admin) [data-flag],body:not(.admin) [data-edit],body:not(.admin) #itfAdd,body:not(.admin) .unsaved{display:none!important}
 .adminbtn{background:none;border:0;color:var(--sub);font-size:12.5px;text-decoration:underline;cursor:pointer;padding:4px}
@@ -251,6 +258,7 @@ body.admin .adminbadge{display:inline-block}
   <span class="upd" id="upd"></span>
   <span class="sp"></span>
   <button class="btn admin-only" id="csvBtn">CSVで商品を追加・更新</button>
+  <button class="btn admin-only" id="ghBtn">GitHub連携</button>
   <button class="adminbtn" id="adminBtn">管理者モード</button>
   <button class="btn" id="helpBtn"><b>？ 使い方</b></button>
   <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
@@ -272,7 +280,7 @@ body.admin .adminbadge{display:inline-block}
     <input type="search" id="q" placeholder="商品名・商品コード・番号で検索" autocomplete="off">
     <div class="row" style="margin-top:8px;justify-content:space-between">
       <span class="note" id="cnt"></span>
-      <span class="row" style="gap:14px"><button class="link" id="itfAdd" hidden>＋ ITFを手で追加</button><button class="link" id="addAll">表示中の商品をすべて追加</button></span>
+      <span class="row" style="gap:14px"><button class="link admin-only" id="qtyAll" hidden>入数をまとめて直す</button><button class="link" id="itfAdd" hidden>＋ ITFを手で追加</button><button class="link" id="addAll">表示中の商品をすべて追加</button></span>
     </div>
     <div class="list" id="list" role="list"></div>
   </section>
@@ -441,6 +449,12 @@ body.admin .adminbadge{display:inline-block}
 </ul>
 <p><b>賞味期限の欄</b>：A4 6面のITFラベルには「賞味期限　年　月　日」の欄があります。貼る前に、箱の賞味期限をペンで書き込んでください（44面にはありません）。</p>
 <p><b>A4 6面を普通紙に印刷して切るとき</b>：プレビューの上の「切り取り線も印刷する」にチェックを入れると、切る位置に点線が入ります。</p>
+<p><b>入数を直すとき（管理者だけ）</b></p>
+<ul>
+<li><b>1件だけ</b>：ITFをえらぶと、真ん中の欄に赤い点線の「入数」の欄が出ます。数字を書き換えるだけで直ります。</li>
+<li><b>まとめて</b>：ITFのタブの「入数をまとめて直す」を押すと、全ITFの入数が一覧で出ます。数字を書き換えて「反映する」を押します。</li>
+<li>最後に、赤い帯の「保存して全員に反映」を押します。</li>
+</ul>
 <p><b>ITFを追加・直すとき（管理者だけ）</b>　右上の「管理者モード」をオンにしてから行います。</p>
 <ol>
 <li>ITFのタブで <b>「＋ ITFを手で追加」</b> を押します。</li>
@@ -485,15 +499,18 @@ body.admin .adminbadge{display:inline-block}
 <div class="cap">線が引いてあるのが今の名前、→ のあとがCSVの新しい名前です。</div>
 
 <h4 id="m11">11. 全員に反映する（管理者だけ）</h4>
-<p>管理者モードでCSVの読み込み、商品の追加・編集・削除、要確認の付け外しをすると、画面の上に赤い帯が出ます。この時点では、変更は自分のパソコンにしかありません。</p>
+<p>管理者モードで商品を変えると、画面の上に赤い帯が出ます。この時点では、変更は自分のパソコンにしかありません。</p>
+<p class="big">赤い帯の「保存して全員に反映」を押すだけで、全員に反映されます（数分かかります）。</p>
+<p><b>最初の1回だけ：GitHub連携をする</b></p>
 <ol>
-<li>赤い帯の <b>「data.json を書き出す」</b> を押し、自分の名前を入れて「書き出す」を押します。「ダウンロード」フォルダに <b>data.json</b> ができます。</li>
-<li>GitHubで、このツールのリポジトリを開きます。</li>
-<li><b>「Add file」→「Upload files」</b> を押し、data.json をドラッグして入れます。</li>
-<li>いちばん下の <b>「Commit changes」</b> を押します。</li>
-<li>数分たつと全員に反映されます。画面上の「データ最終更新：日時（名前）」が新しくなっていれば反映できています。</li>
+<li>GitHubで、右上のプロフィール写真 →「Settings」→ 左の「Developer settings」→「Personal access tokens」の「きめ細かなトークン（Fine-grained tokens）」→「新しいトークンの生成（Generate new token）」を押します。</li>
+<li>トークン名（例：ラベル印刷）と有効期限を決めます。</li>
+<li>「リポジトリ アクセス」で <b>「リポジトリの選択のみ」</b> をえらび、このツールのリポジトリだけを選びます。</li>
+<li>「アクセス許可」の「リポジトリのアクセス許可」で <b>「Contents」を「読み取りと書き込み（Read and write）」</b> にします。</li>
+<li>「トークンの生成」を押し、出てきた鍵（github_pat_… で始まる文字）をコピーします。</li>
+<li>ツールで管理者モードにして、右上の <b>「GitHub連携」</b> を押し、鍵を貼り付けて「つないで確かめる」を押します。</li>
 </ol>
-<div class="warnbox">data.json を上げないと、ほかの人のパソコンには反映されません。<br>終わったら「管理者モードを終わる」を押して、ふだんの画面に戻してください。</div>
+<div class="warnbox">鍵はそのパソコンのブラウザにだけ保存されます。共用のパソコンには入れないでください。有効期限が切れたら、同じ手順で作り直して入れ直します。<br>GitHub連携をしていないパソコンでは、赤い帯のボタンが「data.json を書き出す」になります。その場合は、書き出したファイルをGitHubの「Add file」→「Upload files」で上げます。</div>
 
 <h4 id="m12">12. 印刷がずれるとき</h4>
 <ol>
@@ -648,10 +665,10 @@ function setMode(m){
   $("print").textContent=`印刷する（${M().val}）`;
   document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));
   $("modeHint").textContent=M().hint;
-  $("itfAdd").hidden=m!=="itf"; $("cutWrap").hidden=!(m==="itf"&&itfSize==="6");
+  $("itfAdd").hidden=m!=="itf"; $("qtyAll").hidden=m!=="itf"; $("cutWrap").hidden=!(m==="itf"&&itfSize==="6");
   $("q").value=""; update(); $("q").focus();
 }
-$("modes").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b&&b.dataset.m!==mode){pack=null;setMode(b.dataset.m)}});
+$("modes").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b&&b.dataset.m!==mode)setMode(b.dataset.m)});
 
 /* ---------- 商品リスト ---------- */
 function visible(){const ks=$("q").value.split(/[\s　]+/).map(norm).filter(Boolean);return DB[mode].filter(p=>ks.every(k=>p._s.includes(k)))}
@@ -683,7 +700,7 @@ $("addAll").onclick=async()=>{
   }
   v.forEach(p=>cur().queue.push({v:p.v,q:M().per})); update();
 };
-$("clear").onclick=()=>{cur().queue=[];pack=null;update()};
+$("clear").onclick=()=>{cur().queue=[];update()};
 
 /* ---------- 選んだ商品 ---------- */
 function sheetsOf(q,s0){const P=M().per;const first=Math.min(q,P-s0);return 1+Math.ceil((q-first)/P)}
@@ -698,6 +715,7 @@ function renderQueue(){
     <div class="nm">${esc(p.n)}${p.f?'<span class="flag">要確認</span>':""}</div>
     <div class="meta">${metaLine(p)}</div>
     ${p.f?`<div class="fr">${esc(p.f)}</div>`:""}
+    ${mode==="itf"?`<div class="qedit admin-only"><label for="qq${i}">入数</label><input type="number" id="qq${i}" min="0" max="99999" value="${esc(p.q??"")}" data-qty="${i}" inputmode="numeric"><span class="note">数字を変えると、その場で直ります（最後に「保存」）</span></div>`:""}
     <div class="ctl">
       <label class="note" for="qn${i}">ラベル</label>
       <input type="number" id="qn${i}" min="1" max="9999" value="${x.q}" data-i="${i}" aria-label="ラベルの枚数">
@@ -722,7 +740,9 @@ $("queue").addEventListener("click",async e=>{
   if(fl) await editFlag(BY[mode][Q[+fl.dataset.flag].v]);
   if(ed) await itemDialog(BY[mode][Q[+ed.dataset.edit].v]);
 });
-$("queue").addEventListener("change",e=>{if(e.target.dataset.i==null)return;cur().queue[+e.target.dataset.i].q=Math.max(1,Math.min(9999,parseInt(e.target.value)||1));update()});
+$("queue").addEventListener("change",e=>{
+  if(e.target.dataset.qty!=null){const p=BY.itf[cur().queue[+e.target.dataset.qty].v];const v=e.target.value.trim();const q=v===""?"":Math.max(0,parseInt(v)||0);if(String(p.q??"")!==String(q)){p.q=q;for(const k in fitCache)delete fitCache[k];reindex();markDirty();update()}return}
+  if(e.target.dataset.i==null)return;cur().queue[+e.target.dataset.i].q=Math.max(1,Math.min(9999,parseInt(e.target.value)||1));update()});
 
 /* ---------- 要確認フラグ ---------- */
 async function editFlag(p){
@@ -792,6 +812,29 @@ async function itemDialog(p){
   reindex(); markDirty(); update();
 }
 $("itfAdd").onclick=()=>itemDialog(null);
+$("qtyAll").onclick=async()=>{
+  const rows=DB.itf.slice().sort((a,b)=>(a.c||a.n).localeCompare(b.c||b.n,"ja",{numeric:true})||(a.k>b.k?1:-1));
+  const html=`<h3>入数をまとめて直す</h3>
+    <p class="note">直したい入数の数字を書き換えて「反映する」を押します。変えたところは色が付きます。</p>
+    <input type="search" id="qf" placeholder="商品名・商品コード・ITFでしぼりこみ" style="width:100%">
+    <div class="qscroll"><table class="qtab"><thead><tr><th>商品名</th><th>箱</th><th>ITF</th><th>入数</th></tr></thead><tbody>
+    ${rows.map(p=>`<tr data-v="${p.v}" data-s="${esc(p._s||"")}"><td class="n">${esc(p.n)}<div class="note">${esc(p.c||"")}</div></td><td class="k">${esc(p.k)}</td><td>${p.v}</td><td><input type="number" min="0" max="99999" inputmode="numeric" value="${esc(p.q??"")}" data-o="${esc(p.q??"")}"></td></tr>`).join("")}
+    </tbody></table></div><p class="note" id="qcnt">変更 0件</p>`;
+  const pr=dialog(html,[{t:"やめる",v:"no"},{t:"反映する",v:"yes",main:1}]);
+  const box=$("dlgBox");
+  const cnt=()=>{let n=0;box.querySelectorAll(".qtab tbody tr").forEach(tr=>{const i=tr.querySelector("input");const c=i.value.trim()!==i.dataset.o;tr.classList.toggle("chg",c);if(c)n++});$("qcnt").textContent=`変更 ${n}件`};
+  box.querySelector(".qtab").addEventListener("input",cnt);
+  $("qf").addEventListener("input",()=>{const ks=$("qf").value.split(/[\s　]+/).map(norm).filter(Boolean);box.querySelectorAll(".qtab tbody tr").forEach(tr=>{tr.hidden=!ks.every(k=>tr.dataset.s.includes(k))})});
+  const a=await pr; if(a!=="yes") return;
+  let n=0;
+  box.querySelectorAll(".qtab tbody tr").forEach(tr=>{const i=tr.querySelector("input");const v=i.value.trim();if(v===i.dataset.o)return;const p=BY.itf[tr.dataset.v];p.q=v===""?"":Math.max(0,parseInt(v)||0);n++});
+  if(!n) return;
+  for(const k in fitCache) delete fitCache[k];
+  reindex(); markDirty(); update();
+  const g=ghReady();
+  const v=await dialog(`<h3>入数を${n}件直しました</h3><p>${g?"「保存して全員に反映」を押すと、全員のツールに反映されます。":"「data.json を書き出す」でGitHubに上げると、全員に反映されます。"}</p>`,[{t:"あとで",v:"later"},{t:g?"いま保存する":"いま書き出す",v:"save",main:1}]);
+  if(v==="save") saveFile();
+};
 $("itfSizeBox").addEventListener("change",e=>{if(e.target.name!=="itfsize")return;itfSize=e.target.value;ls("ebl-bc-itfsize",itfSize);
   ST.itf.queue.forEach(x=>{if(x.q===(itfSize==="44"?6:44))x.q=M().per});ST.itf.start=0;setMode("itf")});
 
@@ -858,50 +901,7 @@ function labelHtml(p){
     <svg style="width:${s.w.toFixed(2)}mm;height:${s.h.toFixed(2)}mm" viewBox="0 0 ${s.w} ${s.h}" preserveAspectRatio="none" shape-rendering="crispEdges"><use href="#${s.id}"/></svg>
     <div class="hri">${p.v}</div></div>`;
 }
-/* ---------- まとめ検品君から開いたとき：詰めて印刷 ---------- */
-let pack=null; // {style:"row"|"tight", title, items:[{v,c,n,q,no}]}
-function buildPacked(){
-  const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
-  const ML=(210-m.cols*m.w)/2, MT=(297-m.rows*m.h)/2, P=m.per;
-  // ラベルを1枚ずつ並べる（row：商品が変わったら次の行の左端から）
-  const big=mode==="itf"&&itfSize==="6";
-  const slots=[]; let pos=0;
-  cur().queue.forEach((x,qi)=>{
-    if(pack.style==="row" && pos%m.cols!==0) pos+=m.cols-pos%m.cols;
-    for(let k=0;k<x.q;k++){ slots[pos]={v:x.v,no:qi+1,first:k===0,k:k+1,n:x.q}; pos++; }
-  });
-  const nPages=Math.max(1,Math.ceil(pos/P));
-  const num=n=>`<span class="pkn">${n}</span>`;
-  let html="";
-  for(let pi=0;pi<nPages;pi++){
-    let cells="", marks="";
-    const onPage=new Map();
-    for(let i=0;i<P;i++){
-      const sl=slots[pi*P+i];
-      const c=i%m.cols,r=Math.floor(i/m.cols),posS=`left:${(ML+c*m.w+ox).toFixed(2)}mm;top:${(MT+r*m.h+oy).toFixed(2)}mm;width:${m.w}mm;height:${m.h}mm`;
-      if(sl){ cells+=`<div class="${big?"ic":"lb"}${big&&sl.first?" pkfirst":""}" style="${posS}">${labelHtml(BY[mode][sl.v])}${big?`<div class="pkb">${sl.k}/${sl.n}</div>`:""}</div>`; onPage.set(sl.no,(onPage.get(sl.no)||0)+1); }
-      else if(guide) cells+=`<div class="skipcell" style="${posS}"></div>`;
-    }
-    if(big){ // A4 6面は余白が無いので、番号や一覧は入れない（ラベルに商品名・入数が大きく入っている）
-      let deco=""; if($("cut").checked){for(let c=1;c<m.cols;c++)deco+=`<div class="cutv" style="left:${(ML+c*m.w+ox).toFixed(2)}mm"></div>`;for(let r=1;r<m.rows;r++)deco+=`<div class="cuth" style="top:${(MT+r*m.h+oy).toFixed(2)}mm"></div>`}
-      html+=`<div class="sheet${guide?" guide":""} m-${mode} packed">${deco}${cells}</div>`; continue;
-    }
-    // 左の余白：その行で始まる商品の番号
-    for(let r=0;r<m.rows;r++){
-      const starts=[];
-      for(let c=0;c<m.cols;c++){ const sl=slots[pi*P+r*m.cols+c]; if(sl && (sl.first || (r===0&&c===0))) starts.push(sl.no); }
-      // 1行目の左上は、前のシートからの続きも番号を出す
-      if(starts.length) marks+=`<div class="pkm" style="top:${(MT+r*m.h+oy).toFixed(2)}mm;height:${m.h}mm">${[...new Set(starts)].map(t=>num(t)).join("")}</div>`;
-    }
-    const legend=[...onPage.entries()].map(([no,cnt])=>{const x=cur().queue[no-1],p=BY[mode][x.v];return `${num(no)}${esc(p.c||"")} ${cnt}枚`}).join("　");
-    html+=`<div class="sheet${guide?" guide":""} m-${mode} packed"><div class="hd pkhd"><span class="hn">${pack.title?esc(pack.title)+"　":""}${legend}</span></div><div class="ft">${pi+1} / ${nPages}</div>${marks}${cells}</div>`;
-  }
-  $("sheets").innerHTML=html;
-  $("pvinfo").textContent=nPages>3?`プレビューは最初の3ページだけ表示しています（全${nPages}ページ印刷されます）。`:"";
-  scalePreview();
-}
 function buildSheets(){
-  if(pack) return buildPacked();
   const m=M(), ox=clampOff($("ox").value), oy=clampOff($("oy").value), guide=$("guide").checked;
   const ML=(210-m.cols*m.w)/2, MT=(297-m.rows*m.h)/2, P=m.per;
   const pages=[];
@@ -959,7 +959,7 @@ window.addEventListener("afterprint",async()=>{
   if(document.body.classList.contains("print-manual")){document.body.classList.remove("print-manual");return}
   if(!printingLabels) return; printingLabels=false;
   const a=await dialog(`<h3>印刷画面を閉じました</h3><p>次に使う人がまちがえないように、えらんだ商品を外しておきますか？</p>`,[{t:"このまま残す",v:"keep"},{t:"外す（おすすめ）",v:"clear",main:1}]);
-  if(a==="clear"){cur().queue=[];cur().start=0;pack=null;$("q").value="";update();$("q").focus()}
+  if(a==="clear"){cur().queue=[];cur().start=0;$("q").value="";update();$("q").focus()}
 });
 
 /* ---------- CSV 読み込み（JANとFNSKU） ---------- */
@@ -1024,7 +1024,7 @@ $("csvFile").onchange=async e=>{
   const nD=flagDup();
   if(nA||nC||nD) markDirty();
   update();
-  if(nA||nC){const v=await dialog(`<h3>反映しました（追加${nA}件・変更${nC}件）</h3><p class="big">最後に <b>「data.json を書き出す」</b> を押して、GitHubに上げてください。</p><p>上げないと、ほかの人のパソコンには反映されません。</p>`,[{t:"あとで",v:"later"},{t:"いま書き出す",v:"save",main:1}]);if(v==="save")saveFile()}
+  if(nA||nC){const v=await dialog(`<h3>反映しました（追加${nA}件・変更${nC}件）</h3><p class="big">最後に、画面上の赤い帯のボタン（<b>「保存して全員に反映」</b>または「data.json を書き出す」）を押してください。</p><p>上げないと、ほかの人のパソコンには反映されません。</p>`,[{t:"あとで",v:"later"},{t:ghReady()?"いま保存する":"いま書き出す",v:"save",main:1}]);if(v==="save")saveFile()}
 };
 
 /* ---------- 書き出し（data.json） ---------- */
@@ -1034,7 +1034,7 @@ function cleanDB(db){
   const pick=(arr,keys)=>arr.map(p=>Object.fromEntries(keys.map(k=>[k,p[k]??""])));
   return {updated:db.updated,by:db.by,jan:pick(db.jan,["c","n","v","f","a"]),fba:pick(db.fba,["c","n","v","f","a"]),itf:pick(db.itf,["c","n","v","j","k","q","f","a"])};
 }
-async function saveFile(){
+async function exportFile(){
   const a=await dialog(`<h3>data.json を書き出す</h3><p>あなたの名前（「最終更新した人」として表示されます）</p><input type="text" id="whoTxt" value="${esc(ls("ebl-bc-name")||"")}" style="width:100%">`,[{t:"やめる",v:"no"},{t:"書き出す",v:"yes",main:1}]);
   const who=(($("whoTxt")||{}).value||"").trim();
   if(a!=="yes") return; if(who) ls("ebl-bc-name",who);
@@ -1049,19 +1049,86 @@ async function saveFile(){
     <li>いちばん下の「Commit changes」を押します。</li></ol>
     <p class="note">数分で反映されます。ほかの人は、ツールを開き直すと新しい内容になります。</p>`,[{t:"閉じる",v:"ok",main:1}]);
 }
+/* ---------- GitHubに直接保存 ---------- */
+function guessRepo(){const h=location.hostname.match(/^([^.]+)\.github\.io$/i);const seg=location.pathname.split("/").filter(Boolean)[0];return h&&seg?`${h[1]}/${seg}`:""}
+function ghCfg(){return {repo:ls("ebl-gh-repo")||guessRepo(),token:ls("ebl-gh-token")||"",branch:ls("ebl-gh-branch")||"main"}}
+function ghReady(){const c=ghCfg();return !!(c.repo&&c.token)}
+function b64enc(str){const b=new TextEncoder().encode(str);let s="";for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
+function b64dec(b64){const bin=atob(b64.replace(/\s/g,""));const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u)}
+async function ghGet(c){
+  const r=await fetch(`https://api.github.com/repos/${c.repo}/contents/data.json?ref=${encodeURIComponent(c.branch)}&t=${Date.now()}`,{headers:{Authorization:`Bearer ${c.token}`,Accept:"application/vnd.github+json"},cache:"no-store"});
+  if(!r.ok){const e=new Error("get");e.status=r.status;throw e}
+  const j=await r.json(); return {sha:j.sha,data:JSON.parse(b64dec(j.content))};
+}
+async function ghPut(c,data,sha,msg){
+  const r=await fetch(`https://api.github.com/repos/${c.repo}/contents/data.json`,{method:"PUT",headers:{Authorization:`Bearer ${c.token}`,Accept:"application/vnd.github+json","Content-Type":"application/json"},
+    body:JSON.stringify({message:msg,content:b64enc(JSON.stringify(data)),sha,branch:c.branch})});
+  if(!r.ok){const e=new Error("put");e.status=r.status;throw e}
+  return (await r.json()).content.sha;
+}
+function ghErrText(e){
+  if(e&&e.status===401) return "鍵（トークン）が正しくないか、有効期限が切れています。「GitHub連携」から鍵を入れ直してください。";
+  if(e&&(e.status===403||e.status===404)) return "このリポジトリに書き込む権限がありません。鍵の「リポジトリ アクセス」と「Contents：読み取りと書き込み」を確かめてください。";
+  if(e&&e.status===409) return "ほかの保存と重なりました。もう一度「保存して全員に反映」を押してください。";
+  return "ネットにつながっているか確かめて、もう一度お試しください。";
+}
+let loadedUpdated=null;
+async function saveFile(){
+  if(!ghReady()) return exportFile();
+  let who=ls("ebl-bc-name")||"";
+  if(!who){const a=await dialog(`<h3>保存して全員に反映</h3><p>あなたの名前（「最終更新した人」として表示されます）</p><input type="text" id="whoTxt" style="width:100%">`,[{t:"やめる",v:"no"},{t:"保存する",v:"yes",main:1}]);
+    who=(($("whoTxt")||{}).value||"").trim(); if(a!=="yes") return; if(who) ls("ebl-bc-name",who);}
+  const c=ghCfg(); $("saveBtn").disabled=true; $("saveBtn").textContent="保存しています…";
+  try{
+    const remote=await ghGet(c);
+    if(loadedUpdated&&remote.data.updated&&remote.data.updated!==loadedUpdated){
+      const a=await dialog(`<h3>ほかの人が先に保存しています</h3><p>このツールを開いたあとに、GitHubの商品データが更新されています（${esc(fmtDate(remote.data.updated))}・${esc(remote.data.by||"-")}）。</p><p>このまま保存すると、その更新は消えて、いまの画面の内容になります。</p>`,[{t:"やめる",v:"no"},{t:"上書きして保存する",v:"yes",main:1}]);
+      if(a!=="yes") return;
+    }
+    const next={...DB,updated:new Date().toISOString(),by:who||"名前なし"};
+    await ghPut(c,cleanDB(next),remote.sha,`商品データを更新（${who||"名前なし"}）`);
+    DB.updated=next.updated;DB.by=next.by;loadedUpdated=next.updated;dirty=false;$("unsaved").classList.remove("on");renderUpd();
+    await dialog(`<h3>保存しました</h3><p>全員のツールに反映されるまで、数分かかります。ほかの人は、ツールを開き直すと新しい内容になります。</p>`,[{t:"閉じる",v:"ok",main:1}]);
+  }catch(e){
+    await dialog(`<h3>保存できませんでした</h3><p>${ghErrText(e)}</p><p class="note">変更はこの画面に残っています。「data.json を書き出す」で手で上げることもできます。</p>`,[{t:"data.json を書き出す",v:"exp"},{t:"閉じる",v:"ok",main:1}]).then(v=>{if(v==="exp")exportFile()});
+  }finally{ $("saveBtn").disabled=false; updSaveBtn(); }
+}
+function updSaveBtn(){$("saveBtn").textContent=ghReady()?"保存して全員に反映":"data.json を書き出す"}
+$("ghBtn").onclick=async()=>{
+  const c=ghCfg();
+  const a=await dialog(`<h3>GitHub連携（このパソコンだけ）</h3>
+    <p>鍵（トークン）を一度入れると、「保存して全員に反映」ボタン1つでGitHubの商品データを更新できます。</p>
+    <div class="form">
+      <label for="ghRepo">リポジトリ</label><input id="ghRepo" value="${esc(c.repo)}" placeholder="ユーザー名/リポジトリ名">
+      <label for="ghTok">鍵（トークン）</label><input id="ghTok" type="password" value="${esc(c.token)}" placeholder="github_pat_…" autocomplete="off">
+      <label for="ghWho">あなたの名前</label><input id="ghWho" value="${esc(ls("ebl-bc-name")||"")}">
+      <div class="full err" id="ghErr"></div>
+    </div>
+    <p class="note">鍵はこのパソコンのブラウザにだけ保存されます。共用のパソコンには入れないでください。</p>`,
+    [{t:"鍵を消す",v:"del"},{t:"やめる",v:"no"},{t:"つないで確かめる",v:"yes",main:1}]);
+  if(a==="del"){ls("ebl-gh-token","");updSaveBtn();await dialog(`<h3>鍵を消しました</h3><p>保存は「data.json を書き出す」に戻ります。</p>`,[{t:"閉じる",v:"ok",main:1}]);return}
+  if(a!=="yes") return;
+  const repo=$("ghRepo").value.trim().replace(/^https?:\/\/github\.com\//,"").replace(/\/+$/,""), tok=$("ghTok").value.trim(), who=$("ghWho").value.trim();
+  if(who) ls("ebl-bc-name",who);
+  try{ const r=await ghGet({repo,token:tok,branch:"main"});
+    ls("ebl-gh-repo",repo); ls("ebl-gh-token",tok); updSaveBtn();
+    await dialog(`<h3>つながりました</h3><p>GitHubの商品データ（最終更新：${esc(fmtDate(r.data.updated))}・${esc(r.data.by||"-")}）を確認できました。これからは「保存して全員に反映」で保存できます。</p>`,[{t:"閉じる",v:"ok",main:1}]);
+  }catch(e){ await dialog(`<h3>つながりませんでした</h3><p>${ghErrText(e)}</p><p class="note">リポジトリ名（${esc(repo)}）も確かめてください。</p>`,[{t:"閉じる",v:"ok",main:1}]); }
+};
 $("saveBtn").onclick=saveFile;
 
 /* ---------- 管理者モード ---------- */
 function setAdmin(on){document.body.classList.toggle("admin",on);$("adminBtn").textContent=on?"管理者モードを終わる":"管理者モード";ls("ebl-bc-admin",on?"1":"0")}
 $("adminBtn").onclick=async()=>{
   if(document.body.classList.contains("admin")){
-    if(dirty){const a=await dialog(`<h3>まだ data.json を書き出していません</h3><p>このまま管理者モードを終わると、変更は全員には反映されません（このパソコンの画面には残ります）。</p>`,[{t:"もどる",v:"no"},{t:"終わる",v:"yes",main:1}]);if(a!=="yes")return}
+    if(dirty){const a=await dialog(`<h3>まだ保存していません</h3><p>このまま管理者モードを終わると、変更は全員には反映されません（このパソコンの画面には残ります）。</p>`,[{t:"もどる",v:"no"},{t:"終わる",v:"yes",main:1}]);if(a!=="yes")return}
     setAdmin(false); return;
   }
-  const a=await dialog(`<h3>管理者モードにしますか？</h3><p>商品の追加（CSVの読み込み）、ITFの追加・編集、要確認の付け外しができるようになります。</p><p class="note">変更を全員に反映するには、最後に「data.json を書き出す」でファイルを作り、GitHubに上げる必要があります。ふだん印刷するだけなら、管理者モードは使いません。</p>`,[{t:"やめる",v:"no"},{t:"管理者モードにする",v:"yes",main:1}]);
+  const a=await dialog(`<h3>管理者モードにしますか？</h3><p>商品の追加（CSVの読み込み）、ITFの追加・編集、要確認の付け外しができるようになります。</p><p class="note">変更を全員に反映するには、最後に画面上の赤い帯の「保存して全員に反映」を押します（GitHub連携をしていないときは「data.json を書き出す」でGitHubに上げます）。ふだん印刷するだけなら、管理者モードは使いません。</p>`,[{t:"やめる",v:"no"},{t:"管理者モードにする",v:"yes",main:1}]);
   if(a==="yes") setAdmin(true);
 };
 if(ls("ebl-bc-admin")==="1") setAdmin(true);
+updSaveBtn();
 
 /* ---------- マニュアル ---------- */
 function openManual(){$("manual").classList.add("on");$("manual").scrollTop=0;$("manClose").focus()}
@@ -1071,67 +1138,14 @@ $("manual").addEventListener("click",e=>{if(e.target===$("manual"))closeManual()
 $("manual").querySelectorAll('.man nav a').forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const t=document.getElementById(a.getAttribute("href").slice(1));t&&t.scrollIntoView({behavior:"smooth"})}));
 $("manPrint").onclick=()=>{document.body.classList.add("print-manual");window.print();setTimeout(()=>document.body.classList.remove("print-manual"),1000)};
 
-/* ---------- まとめ検品君からの受け取り（#kenpin=…） ---------- */
-async function fromKenpin(){
-  const m=location.hash.match(/^#kenpin=(.+)$/); if(!m) return;
-  let d; try{ d=JSON.parse(decodeURIComponent(m[1])); }catch(e){ return; }
-  history.replaceState(null,"",location.pathname); // もう一度開いたときに二重に入らないように
-  const items=(d.items||[]).filter(x=>x&&x.c&&x.q>0);
-  if(d.type==="itf") return itfFromKenpin(d,items);
-  const found=[], missing=[];
-  items.forEach(x=>{ const p=DB.jan.find(j=>j.c===x.c); if(p) found.push({v:p.v,q:Math.min(9999,x.q|0)}); else missing.push(x); });
-  if(mode!=="jan") setMode("jan");
-  ST.jan.queue=found; ST.jan.start=0;
-  pack={style:d.pack==="tight"?"tight":"row", title:d.title||""};
-  update();
-  if(missing.length){
-    await dialog(`<h3 style="color:#b91c1c">JANが登録されていない商品があります</h3>
-      <p>次の商品はこのツールにJANが無いので、<b>シールが印刷されません</b>。手書きや別の方法で用意してください。</p>
-      <div class="scroll">${missing.map(x=>`<p><b>${esc(x.c)}</b>　${esc(x.n||"")}　${x.q}枚</p>`).join("")}</div>
-      ${found.length?"<p>ほかの商品は、このあと印刷画面を出します。</p>":""}`,[{t:found.length?"わかった（印刷へ進む）":"閉じる",v:"ok",main:1}]);
-  }
-  if(!found.length) return;
-  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
-  for(const k in fitCache)delete fitCache[k]; buildSheets();
-  setTimeout(()=>$("print").click(),300);
-}
-
-/* ITF：外箱のITFを、1箱1枚・端数の箱にも出す（A4 6面） */
-async function itfFromKenpin(d,items){
-  const found=[], noItf=[], noQ=[];
-  items.forEach(x=>{
-    const jan=x.j||((DB.jan.find(j=>j.c===x.c)||{}).v)||"";
-    const outer=DB.itf.filter(t=>t.k==="外箱");
-    const t=outer.find(t=>t.c&&t.c===x.c) || (jan?outer.find(t=>t.j===jan):null);
-    if(!t){ noItf.push(x); return; }
-    const per=parseInt(t.q,10);
-    if(!(per>0)){ noQ.push({...x,v:t.v}); return; }
-    const boxes=Math.ceil(x.q/per);
-    const prev=found.find(f=>f.v===t.v); if(prev) prev.q+=boxes; else found.push({v:t.v,q:boxes,_x:x,_per:per});
-  });
-  itfSize="6"; ls("ebl-bc-itfsize","6"); setMode("itf");
-  ST.itf.queue=found.map(f=>({v:f.v,q:Math.min(9999,f.q)})); ST.itf.start=0;
-  pack={style:d.pack==="row"?"row":"tight", title:d.title||""};
-  update();
-  const list=found.map(f=>`<p><b>${esc(f._x.c)}</b>　${f._x.q}個 ÷ 入数${f._per} → <b>${f.q}枚</b></p>`).join("");
-  let html=`<h3>ITF（外箱・A4 6面）を印刷します</h3><p>1箱に1枚、端数の箱にも1枚出します。<b>A4の6面シートを新しく1枚目から</b>入れてください。</p>
-    ${found.length?`<div class="scroll">${list}</div><p>合計 <b>${found.reduce((a,b)=>a+b.q,0)}枚</b>（${Math.ceil(found.reduce((a,b)=>a+b.q,0)/6)}シート）</p>`:"<p><b>ITFを印刷できる商品がありません。</b></p>"}`;
-  if(noQ.length) html+=`<p style="color:#b91c1c"><b>入数が登録されていないので出せません：</b>${noQ.map(x=>esc(x.c)).join("、")}</p>`;
-  if(noItf.length) html+=`<details><summary>ITFが登録されていない商品（${noItf.length}件・印刷されません）</summary><p class="note">${noItf.map(x=>esc(x.c)+" "+esc(x.n||"")).join("<br>")}</p></details>`;
-  await dialog(html,[{t:found.length?"印刷へ進む":"閉じる",v:"ok",main:1}]);
-  if(!found.length) return;
-  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
-  for(const k in fitCache)delete fitCache[k]; buildSheets();
-  setTimeout(()=>$("print").click(),300);
-}
-
 /* ---------- 起動 ---------- */
 async function boot(){
   try{
-    const r=await fetch("data.json",{cache:"no-store"}); if(!r.ok) throw new Error(r.status);
-    DB=await r.json(); DB.jan=DB.jan||[];DB.fba=DB.fba||[];DB.itf=DB.itf||[];
+    let got=null;
+    if(ls("ebl-bc-admin")==="1"&&ghReady()){try{got=(await ghGet(ghCfg())).data}catch(e){}}
+    if(!got){const r=await fetch("data.json",{cache:"no-store"}); if(!r.ok) throw new Error(r.status); got=await r.json()}
+    DB=got; loadedUpdated=DB.updated||null; DB.jan=DB.jan||[];DB.fba=DB.fba||[];DB.itf=DB.itf||[];
     reindex(); setMode(mode);
-    await fromKenpin();
   }catch(e){
     $("list").innerHTML=`<div class="empty">商品データを読み込めませんでした。<br>ネットにつながっているか確かめて、ツールを開き直してください。</div>`;
   }
